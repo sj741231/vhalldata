@@ -77,13 +77,13 @@ class Samples(object):
         assert isinstance(search_key, str) and str(
             search_key).strip(), f"Samples object property must be string and can't be empty"
 
-        _sample_obj_property = self.get_property(property_name)
+        _sample_obj_property = self.get_property(property_name).get(search_key, {})
 
         if not _sample_obj_property or _sample_obj_property.get('termination'):
             return _sample_obj_property
         else:
             _property_name, _search_key = _sample_obj_property.popitem()
-            self.recursive_search_key_value(_property_name, _search_key)
+            return self.recursive_search_key_value(_property_name, _search_key)
 
 
 def get_samples_object(row_object_iterator, **kwargs):
@@ -245,5 +245,7 @@ if __name__ == "__main__":
     pprint(samples_object.related_institutions_abbr_name)
     print("###" * 30)
 
+    result = samples_object.recursive_search_key_value('insurance_sale_abbr_name', '长安保险销售')
+    print(f"result: {result}")
     print("###" * 30)
 
