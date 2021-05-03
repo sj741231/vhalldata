@@ -157,9 +157,21 @@ def is_ipv4(address):
         return False
 
 
-def re_bank(name):
+def re_like_bank(name):
     if isinstance(name, (str,)):
         _re_bank = re.compile(r'^.*(银行|行)+')
+        return _re_bank.match(name)
+
+
+def re_bank(name):
+    if isinstance(name, (str,)):
+        _re_bank = re.compile(r'^.*(银行)+')
+        return _re_bank.match(name)
+
+
+def re_insurance(name):
+    if isinstance(name, (str,)):
+        _re_bank = re.compile(r'^.*(保险)+')
         return _re_bank.match(name)
 
 
@@ -171,8 +183,14 @@ def re_economic_company(name):
 
 def re_agency_company(name):
     if isinstance(name, (str,)):
-        _re_agency_company = re.compile(r'^.*(代理|销售)+')
+        _re_agency_company = re.compile(r'^.*(代理)+')
         return _re_agency_company.match(name)
+
+
+def re_sale_company(name):
+    if isinstance(name, (str,)):
+        _re_sale_company = re.compile(r'^.*(销售)+')
+        return _re_sale_company.match(name)
 
 
 def re_appraisal_company(name):

@@ -1,9 +1,6 @@
 import os
 import sys
-import getopt
-import time
 import re
-import difflib
 import jieba
 from utils.util_xlsx import HandleXLSX
 from utils.util_re import re_remove_sub_company

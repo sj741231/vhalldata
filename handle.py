@@ -7,14 +7,16 @@ import getopt
 import time
 import re
 import difflib
+from pprint import pprint
 from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError
 from utils.util_logfile import nlogger, flogger, slogger, traceback
 from utils.util_xlsx import HandleXLSX
-from utils.util_re import re_bank, re_agency_company, re_appraisal_company, re_economic_company
+from utils.util_re import re_bank, re_agency_company, re_sale_company, re_appraisal_company, re_economic_company
 from datetime import datetime
 from settings import TASK_WAITING_TIME, MAX_WORKERS, DICT_FILE, EXCLUDE_WORDS
 from row_object import RowStatus
 from extract_name import extract_company_name
+from structure_sample import get_samples_object
 
 
 class GetURLError(Exception):
@@ -53,7 +55,7 @@ def exec_func(check_file, file_name=None, sheet_name=None, start_point=None, end
         _dict_file_name = check_file_name(DICT_FILE, **kwargs)
         # _dict_file_name = check_file_name('会员单位名单.xlsx', **kwargs)
         _dict_xls, _dict_row_object_iterator = get_row_object_iterator(check_file, _dict_file_name, 'dict', **kwargs)
-        company_dict = get_company_dict(_dict_row_object_iterator, **kwargs)
+        company_dict = get_company_obj(_dict_row_object_iterator, **kwargs)
 
         # Prepare source data
         _data_file_name = check_file_name(file_name, **kwargs)
@@ -87,30 +89,7 @@ def check_file_name(file_name, **kwargs):
     return _file_name
 
 
-def get_company_dict(row_object_iterator, **kwargs):
-    company_dict = dict()
-    for row_object in row_object_iterator:
-        abbr_name = row_object.column_value.get('简称')
-        full_name = row_object.column_value.get('单位名称')
-        if full_name:
-            company_dict[full_name] = {'full_name': row_object.column_value.get('单位名称'),
-                                       'company_type': row_object.column_value.get('单位类别')}
-        if abbr_name:
-            company_dict[abbr_name] = {'full_name': row_object.column_value.get('单位名称'),
-                                       'company_type': row_object.column_value.get('单位类别')}
-            if re_economic_company(abbr_name):
-                idx = abbr_name.find('经纪')
-                company_dict[abbr_name[:idx]] = {'full_name': row_object.column_value.get('单位名称'),
-                                                 'company_type': row_object.column_value.get('单位类别')}
-            elif re_agency_company(abbr_name):
-                idx = abbr_name.find('代理') if abbr_name.find('代理') else abbr_name.find('销售')
-                company_dict[abbr_name[:idx]] = {'full_name': row_object.column_value.get('单位名称'),
-                                                 'company_type': row_object.column_value.get('单位类别')}
-            elif re_appraisal_company(abbr_name):
-                idx = abbr_name.find('公估')
-                company_dict[abbr_name[:idx]] = {'full_name': row_object.column_value.get('单位名称'),
-                                                 'company_type': row_object.column_value.get('单位类别')}
-    return company_dict
+
 
 
 def get_row_object_iterator(check_file, file_name, sheet_name=None, start_point=None, end_point=None, **kwargs):
@@ -362,6 +341,8 @@ def match_company_type(company_name, **kwargs):
     elif re_appraisal_company(company_name):
         _company_type = "公估公司"
     elif re_agency_company(company_name):
+        _company_type = "代理公司"
+    elif re_sale_company(company_name):
         _company_type = "代理公司"
     else:
         _company_type = "相关机构"
