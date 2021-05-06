@@ -6,17 +6,19 @@ import sys
 import getopt
 import time
 import re
+import jieba
 import difflib
 from pprint import pprint
 from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError
 from utils.util_logfile import nlogger, flogger, slogger, traceback
 from utils.util_xlsx import HandleXLSX
-from utils.util_re import re_bank, re_agency_company, re_sale_company, re_appraisal_company, re_economic_company
+from utils.util_re import re_bank, re_like_bank, re_agency_company, re_sale_company, re_appraisal_company, \
+    re_economic_company, re_insurance, re_like_insurance, re_company
 from datetime import datetime
-from settings import TASK_WAITING_TIME, MAX_WORKERS, DICT_FILE, EXCLUDE_WORDS
+from settings import TASK_WAITING_TIME, MAX_WORKERS, SAMPLES_FILE, EXCLUDE_WORDS
 from row_object import RowStatus
 from extract_name import extract_company_name
-from structure_sample import get_samples_object
+from structure_sample import get_samples_object, Samples
 
 
 class GetURLError(Exception):
@@ -52,18 +54,20 @@ def exec_func(check_file, file_name=None, sheet_name=None, start_point=None, end
     """
     try:
         # Construct dictionary of company
-        _dict_file_name = check_file_name(DICT_FILE, **kwargs)
+        _dict_file_name = check_file_name(SAMPLES_FILE, **kwargs)
         # _dict_file_name = check_file_name('会员单位名单.xlsx', **kwargs)
-        _dict_xls, _dict_row_object_iterator = get_row_object_iterator(check_file, _dict_file_name, 'dict', **kwargs)
-        company_dict = get_company_obj(_dict_row_object_iterator, **kwargs)
+        _dict_xls, _dict_row_object_iterator = get_row_object_iterator(check_file, _dict_file_name, 'listing', **kwargs)
+        samples_object = get_samples_object(_dict_row_object_iterator, **kwargs)
+        nlogger.info(f"get_samples_object has been completed")
 
         # Prepare source data
         _data_file_name = check_file_name(file_name, **kwargs)
         _data_xls, _data_row_object_iterator = get_row_object_iterator(check_file, _data_file_name, sheet_name,
                                                                        start_point, end_point, **kwargs)
-
-        _data_result = handle_data_thread(row_object_iterator=_data_row_object_iterator, company_dict=company_dict,
+        nlogger.info(f"handle_data_thread start")
+        _data_result = handle_data_thread(row_object_iterator=_data_row_object_iterator, samples_object=samples_object,
                                           **kwargs)
+        nlogger.info(f"write_result_to_xls start")
         write_result_to_xls(_data_xls, _data_result)
     except (GetRowIterError, HandleDataError, ThreadTaskError, WriteResultError) as e:
         nlogger.error('{fn} Custom error: {e}'.format(fn='exec_func', e=repr(e)))
@@ -87,9 +91,6 @@ def check_file_name(file_name, **kwargs):
     _file_name = str(file_name).strip()
     assert os.path.exists(_file_name), "file_name {f} does not exists".format(f=_file_name)
     return _file_name
-
-
-
 
 
 def get_row_object_iterator(check_file, file_name, sheet_name=None, start_point=None, end_point=None, **kwargs):
@@ -196,8 +197,8 @@ def check_row_object(row_object, **kwargs):
     :param kwargs:
     :return:
     """
-    assert kwargs.get('company_dict') and isinstance(kwargs.get('company_dict'),
-                                                     dict), "Parameter company_dict must be dict and not be empty"
+    assert kwargs.get('samples_object') and isinstance(kwargs.get('samples_object'),
+                                                       Samples), "Parameter samples_object must be instance of Samples"
     assert isinstance(row_object.file_name, str) and str(
         row_object.file_name).strip(), "Invalid parameter file_name: {p}".format(p=str(row_object.file_name).strip())
     assert isinstance(row_object.sheet_name, str) and str(
@@ -225,8 +226,8 @@ def handle_data(row_object, **kwargs):
         # kwargs['company_name'] = str(row_object.column_value.get('公司')).strip()
         _source_company_name = str(row_object.column_value.get('公司')).strip()
         kwargs['company_name'] = extract_company_name(_source_company_name)
-        assert kwargs.get('company_dict'), "company dict is invalid"
         assert kwargs.get('company_name'), "company name is invalid"
+        assert kwargs.get('samples_object'), "company dict is invalid"
 
         _row_object = set_row_object_company_info(row_object, **kwargs)
 
@@ -238,76 +239,145 @@ def handle_data(row_object, **kwargs):
         raise HandleDataError("{fn} error: {e}".format(fn='handle_data', e=repr(e)))
 
 
-def set_row_object_company_info(row_object, company_dict, company_name, **kwargs):
+def set_row_object_company_info(row_object, samples_object, company_name, **kwargs):
     """
     add row object property that include company name and company type
     :param row_object:
-    :param company_dict:
-    :param company_name:
+    :param samples_object: instance of class Samples
+    :param company_name: extract company'name from '公司' column in source excel
     :param kwargs:
     :return:
     """
 
-    _company_info = company_dict.get(company_name)
+    # _company_info = samples_object.all_name.get(company_name)
+    _company_info = samples_object.recursive_search_key_value('all_name', company_name)
+    # print("###" * 30)
+    # print(f"{row_object.position} company_name: {company_name}, _company_info: {_company_info}")
+    # print("###" * 30)
     if _company_info:
         row_object.column_value['result'] = f'已知单位'
         row_object.column_value['company_name'] = company_name
+        row_object.column_value['guess_name'] = ''
         row_object.column_value['company_full_name'] = _company_info.get('full_name')
         row_object.column_value['company_type'] = _company_info.get('company_type')
-        row_object.column_value['similarity'] = 1
+        row_object.column_value['similarity'] = ''
         row_object.status = RowStatus.EXISTENCE.value
-    elif re_bank(company_name):
-        row_object.column_value['result'] = f'未知单位'
+    # elif len(company_name) > 14 and re_company(company_name):
+    #     row_object.column_value['result'] = f'未匹配单位'
+    #     row_object.column_value['company_name'] = company_name
+    #     row_object.column_value['guess_name'] = ''
+    #     row_object.column_value['company_full_name'] = company_name
+    #     row_object.column_value['company_type'] = match_company_type(company_name)[0]
+    #     row_object.column_value['similarity'] = ''
+    #     row_object.status = RowStatus.NONEXISTENCE.value
+    elif re_like_bank(company_name):
+        row_object.column_value['result'] = f'银行系统'
         row_object.column_value['company_name'] = company_name
-        row_object.column_value['company_full_name'] = ''
-        row_object.column_value['company_type'] = match_company_type(company_name)
+        row_object.column_value['guess_name'] = ''
+        row_object.column_value['company_full_name'] = company_name
+        row_object.column_value['company_type'] = match_company_type(company_name)[0]
         row_object.column_value['similarity'] = ''
         row_object.status = RowStatus.NONEXISTENCE.value
     else:
-        similarity_result, similarity_company_name = similarity_match_company_name(company_dict, company_name, **kwargs)
-        if similarity_result < 0.2:
+        similarity_result, similarity_company_name = similarity_match_company_name(samples_object, company_name,
+                                                                                   **kwargs)
+        if similarity_result <= 0.5:
             row_object.column_value['result'] = f'未知单位'
             row_object.column_value['company_name'] = company_name
-            row_object.column_value['company_full_name'] = ''
-            row_object.column_value['company_type'] = match_company_type(company_name)
+            row_object.column_value['guess_name'] = ''
+            row_object.column_value['company_full_name'] = company_name
+            row_object.column_value['company_type'] = match_company_type(company_name)[0]
             row_object.column_value['similarity'] = ''
             row_object.status = RowStatus.NONEXISTENCE.value
         else:
-            _company_info = company_dict.get(similarity_company_name)
+            _company_info = samples_object.recursive_search_key_value('all_name', similarity_company_name)
+            # print("***" * 30)
+            # print(f"{row_object.position} company_name: {company_name}, _company_info: {_company_info}")
+            # print("***" * 30)
+            # _company_info = samples_object.recursive_search_key_value('all_name', company_name)
+            # _company_info = company_dict.get(similarity_company_name)
 
-            if similarity_result > 0.8:
+            if similarity_result > 0.9:
                 row_object.column_value['result'] = f'近似单位'
 
-            elif similarity_result > 0.5:
+            elif similarity_result >= 0.8:
                 row_object.column_value['result'] = f'相似单位'
 
-            elif similarity_result >= 0.2:
-                row_object.column_value['result'] = f'疑似单位'
+            elif similarity_result > 0.5:
+                row_object.column_value['result'] = f'猜测单位'
 
             row_object.column_value['company_name'] = company_name
-            row_object.column_value['company_full_name'] = _company_info.get('full_name')
+            row_object.column_value['guess_name'] = _company_info.get('full_name')
+            row_object.column_value['company_full_name'] = ''
             row_object.column_value['company_type'] = _company_info.get('company_type')
-            row_object.column_value['similarity'] = round(similarity_result, 2)
+            row_object.column_value['similarity'] = round(similarity_result, 3)
             row_object.status = RowStatus.SIMILARITY.value
 
     return row_object
 
 
-def similarity_match_company_name(company_dict, company_name, **kwargs):
+def get_company_name_search_type(company_name, **kwargs):
+    """
+    Match company type
+    :param company_name:
+    :param kwargs:
+    :return:
+    """
+    _company_type, _samples_property_name = match_company_type(company_name)
+    return _samples_property_name
+
+
+def get_full_or_abbr_property(company_name, length=12, **kwargs):
+    """
+    Judge full or abbreviation
+    :param company_name:
+    :param length:
+    :param kwargs:
+    :return:
+    """
+    _full_or_abbr = "abbr" if len(company_name) < length else "full"
+    return str(_full_or_abbr).strip()
+
+
+def get_samples_property(samples_object, samples_property_name, full_or_abbr, **kwargs):
+    """
+    structure samples property name and get property(dict)
+    :param samples_object:
+    :param samples_property_name:
+    :param full_or_abbr:
+    :param kwargs:
+    :return:
+    """
+    _property_name = f"{samples_property_name}_{full_or_abbr}_name"
+    return samples_object.get_property(_property_name)
+
+
+def similarity_match_company_name(samples_object, company_name, **kwargs):
     similarity_result = 0
     similarity_company_name = None
-    _company_name = filter_company_name(company_name)
+    _company_name = str(company_name).strip()
 
-    for company_dict_name in company_dict.keys():
-        similarity_rate = difflib.SequenceMatcher(None, company_dict_name, _company_name).ratio()
-        if similarity_rate > similarity_result:
-            similarity_result = similarity_rate
-            similarity_company_name = company_dict_name
-    # print("***" * 30)
-    # print("_company_name ", _company_name)
-    # print("similarity_company_name ", similarity_company_name)
-    # print("similarity_result ", similarity_result)
-    # print("***" * 30)
+    _samples_property_name = get_company_name_search_type(_company_name, **kwargs)
+    _full_or_abbr = get_full_or_abbr_property(_company_name, **kwargs)
+    _samples_company_name_dict = get_samples_property(samples_object, _samples_property_name, _full_or_abbr, **kwargs)
+
+    # _company_name = filter_company_name(company_name)   ?????
+
+    if _full_or_abbr == 'full':
+        _company_name_list = jieba.lcut(_company_name)
+        for samples_company_name in _samples_company_name_dict.keys():
+            _samples_company_name_list = jieba.lcut(samples_company_name)
+            similarity_rate = difflib.SequenceMatcher(None, _company_name_list, _samples_company_name_list).ratio()
+            if similarity_rate > similarity_result:
+                similarity_result = similarity_rate
+                similarity_company_name = samples_company_name
+    else:
+        for samples_company_name in _samples_company_name_dict.keys():
+            similarity_rate = difflib.SequenceMatcher(None, _company_name, samples_company_name).ratio()
+            if similarity_rate > similarity_result:
+                similarity_result = similarity_rate
+                similarity_company_name = samples_company_name
+
     return similarity_result, similarity_company_name
 
 
@@ -332,21 +402,31 @@ def match_company_type(company_name, **kwargs):
     match company type
     :param company_name: company name
     :param kwargs:
-    :return: company type
+    :return: company type, Samples property name
     """
-    if re_bank(company_name):
+    if re_like_bank(company_name):
         _company_type = "银行"
-    elif re_economic_company(company_name):
-        _company_type = "经纪公司"
+        _samples_property_name = 'bank'
     elif re_appraisal_company(company_name):
         _company_type = "公估公司"
+        _samples_property_name = 'insurance_appraisal'
+    elif re_economic_company(company_name):
+        _company_type = "经纪公司"
+        _samples_property_name = 'insurance_economic'
     elif re_agency_company(company_name):
         _company_type = "代理公司"
+        _samples_property_name = 'insurance_agency'
     elif re_sale_company(company_name):
         _company_type = "代理公司"
+        _samples_property_name = 'insurance_sale'
+    elif re_like_insurance(company_name):
+        _company_type = "保险公司"
+        _samples_property_name = 'insurance_company'
     else:
         _company_type = "相关机构"
-    return _company_type
+        _samples_property_name = 'all'  # 如果上述判定不了，就全部比较匹配
+
+    return str(_company_type).strip(), str(_samples_property_name).strip()
 
 
 def recursive_get_index(query_list, query_value):
@@ -382,6 +462,10 @@ def write_result_to_xls(source_xls, data_result):
         if y_name > columns_number:
             source_xls.write_sheet_rows_value(sheet_name=source_xls.sheet.title, values=(1, y_name, 'name'))
 
+        y_guess_name = recursive_get_index(column_name_list, 'guess_name') + 1
+        if y_guess_name > columns_number:
+            source_xls.write_sheet_rows_value(sheet_name=source_xls.sheet.title, values=(1, y_guess_name, 'guess_name'))
+
         y_full_name = recursive_get_index(column_name_list, 'full_name') + 1
         if y_full_name > columns_number:
             source_xls.write_sheet_rows_value(sheet_name=source_xls.sheet.title, values=(1, y_full_name, 'full_name'))
@@ -403,6 +487,11 @@ def write_result_to_xls(source_xls, data_result):
             if row_object.column_value.get('company_name'):
                 y = y_name
                 values = (x, y, row_object.column_value.get('company_name'))
+                source_xls.write_sheet_rows_value(sheet_name=row_object.sheet_name, values=values)
+
+            if row_object.column_value.get('guess_name'):
+                y = y_guess_name
+                values = (x, y, row_object.column_value.get('guess_name'))
                 source_xls.write_sheet_rows_value(sheet_name=row_object.sheet_name, values=values)
 
             if row_object.column_value.get('company_full_name'):

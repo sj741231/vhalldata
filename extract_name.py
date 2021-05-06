@@ -3,16 +3,38 @@ import sys
 import re
 import jieba
 from utils.util_xlsx import HandleXLSX
-from utils.util_re import re_remove_sub_company
-from settings import PROVINCE
+from utils.util_re import re_remove_sub_company, re_full_company_name
+from settings import PROVINCE, EXCLUDE_WORDS, EXTRACT_WORDS
 
 
 def extract_company_name(company_name):
-    # company_name = str(company_name).strip()
-    _company_name = "".join(str(company_name).split())
+    _company_name = str(company_name).strip()
+    _company_name = _company_name.replace(" ", "")
+
     pre_company_name = pre_trim_company_name(_company_name)
     mid_company_name = mid_trim_company_name(pre_company_name)
-    return mid_company_name
+    post_company_name = post_trim_company_name(mid_company_name)
+
+    return post_company_name
+
+
+def post_trim_company_name(company_name):
+    """
+    If company name include word in EXTRACT_WORDS, then return word
+    If company name does't include '公司' or include word in EXCLUDE_WORDS, then trim company name
+    :param company_name:
+    :return:
+    """
+    # 注意 EXTRACT_WORDS 中字段有优先顺序，从左到右
+    for _word in EXTRACT_WORDS:
+        if company_name.find(_word) != -1:
+            return _word
+
+    if not re_full_company_name(company_name) or re_remove_sub_company(company_name):
+        for _word in EXCLUDE_WORDS:
+            if company_name.find(_word) != -1:
+                return trim_string(company_name, _word)
+    return company_name
 
 
 def pre_trim_company_name(company_name):
@@ -20,13 +42,11 @@ def pre_trim_company_name(company_name):
         pre_company_name = trim_string(company_name, '公司')
     elif company_name.find('银行') != -1:
         pre_company_name = trim_string(company_name, '银行')
+    elif company_name.find('集团') != -1:
+        pre_company_name = trim_string(company_name, '集团')
     else:
         pre_company_name = company_name
 
-    # pre_company_name = re.split('省|市|县|区', pre_company_name)[0]
-    # _re_compile = re.compile(r'^.{4,}(支|分)+')
-    # if _re_compile.match(pre_company_name):
-    #     pre_company_name = re.sub(r'(省|市|县|区)', '', pre_company_name)
     return pre_company_name
 
 
@@ -38,31 +58,65 @@ def mid_trim_company_name(company_name):
     :param company_name:
     :return:
     """
-    # _re_compile = re.compile(r'^.{4,}(支|分)+')
-    # if _re_compile.match(company_name):
-    #     mid_company_name = re.sub(r'(省|市|县|区)', '', company_name)
-
     if re_remove_sub_company(company_name):
-        mid_company_name = re.sub(r'(省|市|县|区)', '', company_name)
+        # company_name = re.sub(r'(省|自治区|市|县|区|州)', '', company_name)
 
-        company_name_list = list(jieba.lcut(mid_company_name))
+        company_name_list = list(jieba.lcut(company_name))
         company_name_list_len = len(company_name_list)
 
         if company_name_list_len > 1:
             company_name_list.reverse()
             for idx in range(0, company_name_list_len - 1):
-                if company_name_list[idx] in PROVINCE:
-                    remove_words = recursive_get_keyword(company_name_list, company_name_list_len, idx)
-                    mid_company_name = trim_string(mid_company_name, remove_words, start=2, reserve=False)
-                    if re_remove_sub_company(mid_company_name):
+                _keyword = search_province_word(company_name_list[idx])
+                if _keyword:
+                    company_name = trim_string(company_name, _keyword, start=2, reserve=False)
+                    if re_remove_sub_company(company_name):
                         continue
                     else:
-                        return mid_company_name
-            return mid_company_name
+                        return company_name
+
+                # if company_name_list[idx] in PROVINCE:
+                #     # remove_words = recursive_get_keyword(company_name_list, company_name_list_len, idx)
+                #     # mid_company_name = trim_string(company_name, remove_words, start=2, reserve=False)
+                #     company_name = trim_string(company_name, company_name_list[idx], start=2, reserve=False)
+                #     if re_remove_sub_company(company_name):
+                #         continue
+                #     else:
+                #         return company_name
+                # else:
+                #     _keyword = re.sub(r'(省|自治区|市)', '', company_name_list[idx])
+                #     if _keyword in PROVINCE:
+                #         company_name = trim_string(company_name, _keyword, start=2, reserve=False)
+                #         if re_remove_sub_company(company_name):
+                #             continue
+                #         else:
+                #             return company_name
+                #     else:
+                #         _keyword = re.sub(r'(县|区|州)', '', company_name_list[idx])
+                #         if _keyword in PROVINCE:
+                #             company_name = trim_string(company_name, _keyword, start=2, reserve=False)
+                #             if re_remove_sub_company(company_name):
+                #                 continue
+                #             else:
+                #                 return company_name
+
+            return company_name
         else:
-            return mid_company_name
+            return company_name
     else:
         return company_name
+
+
+def search_province_word(key_word):
+    if key_word in PROVINCE:
+        return key_word
+    elif len(key_word) > 1:
+        for word in list(jieba.lcut(key_word, cut_all=True)):
+            if len(word) > 1:
+                if word in PROVINCE:
+                    return word
+    else:
+        return
 
 
 def recursive_get_keyword(company_name_list, company_name_list_len, idx, keyword=None):
@@ -91,7 +145,6 @@ def trim_string(full_string, sub_string, start=None, end=None, reserve=True, tri
     _sub_string = str(sub_string).strip()
     if _full_string and _sub_string:
         _sub_string_length = len(_sub_string)
-
         if trim_sort is True:
             idx = _full_string.find(sub_string, start, end)
             # print("*** ", _full_string, _sub_string, _sub_string_length, idx)
@@ -114,16 +167,18 @@ if __name__ == "__main__":
 
     filename = '报名表单数据.xlsx'
     xls = HandleXLSX(filename)
-    # rows = xls.generator_rows_value_iterator(sheet_name='listing', start_point=1, end_point=10)
-    #
-    # for i in rows:
-    #     print("row: ", i)
 
     print("***" * 30)
     rows = xls.generate_row_object_iterator(check_file=False, sheet_name='listing', start_point=2, end_point=10000)
 
-    # for j in rows:
-    #     print("row: ", j, j.__dict__)
-
     for i in rows:
         print(i.position, i.column_value.get('公司'), extract_company_name(i.column_value.get('公司')))
+    print("###" * 30)
+
+    #####################################################################################################
+
+    # print("###" * 30)
+    # keyword = '人保寿险博州中支公司'
+    # result = extract_company_name(keyword)
+    # print(f"result: {result}")
+    # print("###" * 30)

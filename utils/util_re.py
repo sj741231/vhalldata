@@ -159,20 +159,38 @@ def is_ipv4(address):
 
 def re_like_bank(name):
     if isinstance(name, (str,)):
-        _re_bank = re.compile(r'^.*(银行|行)+')
+        _re_bank = re.compile(r'^.*(银行)+(?!保险)')
         return _re_bank.match(name)
+
+
+# def re_like_bank(name):
+#     if isinstance(name, (str,)):
+#         _re_bank = re.compile(r'^.*(银行|行)+$')
+#         return _re_bank.match(name)
 
 
 def re_bank(name):
     if isinstance(name, (str,)):
-        _re_bank = re.compile(r'^.*(银行)+')
+        _re_bank = re.compile(r'^.*(银行)+(?!保险)')
         return _re_bank.match(name)
+
+
+def re_company(name):
+    if isinstance(name, (str,)):
+        _re_company = re.compile(r'^.*(公司)+$')
+        return _re_company.match(name)
+
+
+def re_like_insurance(name):
+    if isinstance(name, (str,)):
+        _re_insurance = re.compile(r'^.*(保|险)+')
+        return _re_insurance.match(name)
 
 
 def re_insurance(name):
     if isinstance(name, (str,)):
-        _re_bank = re.compile(r'^.*(保险)+')
-        return _re_bank.match(name)
+        _re_insurance = re.compile(r'^.*(保险)+')
+        return _re_insurance.match(name)
 
 
 def re_economic_company(name):
@@ -203,3 +221,9 @@ def re_remove_sub_company(name):
     if isinstance(name, (str,)):
         _re_compile = re.compile(r'^.{4,}(支|分)+')
         return _re_compile.match(name)
+
+
+def re_full_company_name(name):
+    if isinstance(name, (str,)):
+        _re_full_company = re.compile(r'^.*(公司|银行|集团)+$')
+        return _re_full_company.match(name)
