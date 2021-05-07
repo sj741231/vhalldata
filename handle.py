@@ -297,21 +297,22 @@ def set_row_object_company_info(row_object, samples_object, company_name, **kwar
             # _company_info = samples_object.recursive_search_key_value('all_name', company_name)
             # _company_info = company_dict.get(similarity_company_name)
 
-            if similarity_result > 0.9:
-                row_object.column_value['result'] = f'近似单位'
-
-            elif similarity_result >= 0.8:
-                row_object.column_value['result'] = f'相似单位'
-
-            elif similarity_result > 0.5:
-                row_object.column_value['result'] = f'猜测单位'
-
             row_object.column_value['company_name'] = company_name
             row_object.column_value['guess_name'] = _company_info.get('full_name')
             row_object.column_value['company_full_name'] = ''
             row_object.column_value['company_type'] = _company_info.get('company_type')
             row_object.column_value['similarity'] = round(similarity_result, 3)
             row_object.status = RowStatus.SIMILARITY.value
+
+            if similarity_result > 0.9:
+                row_object.column_value['result'] = f'近似单位'
+                row_object.column_value['company_full_name'] = _company_info.get('full_name')
+
+            elif similarity_result >= 0.8:
+                row_object.column_value['result'] = f'相似单位'
+
+            elif similarity_result > 0.5:
+                row_object.column_value['result'] = f'猜测单位'
 
     return row_object
 
