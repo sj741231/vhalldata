@@ -2,9 +2,8 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="a1f60c10-6420-469e-8fe7-c5f92003d922" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/similarity.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/readme.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/handle.py" beforeDir="false" afterPath="$PROJECT_DIR$/handle.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -95,7 +94,8 @@
       <workItem from="1620003972865" duration="46348000" />
       <workItem from="1620090070488" duration="17836000" />
       <workItem from="1620297521937" duration="830000" />
-      <workItem from="1620354208649" duration="359000" />
+      <workItem from="1620354208649" duration="590000" />
+      <workItem from="1620447085385" duration="770000" />
     </task>
     <task id="LOCAL-00001" summary="ver 1.0&#10;修改了清洗数据，整理了公司名称">
       <created>1619974369729</created>
@@ -125,7 +125,14 @@
       <option name="project" value="LOCAL" />
       <updated>1620298301467</updated>
     </task>
-    <option name="localTasksCounter" value="5" />
+    <task id="LOCAL-00005" summary="ver 2.1&#10;修改，如果近似度超过0.9，自动填写'company_full_name'名称">
+      <created>1620357848860</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1620357848860</updated>
+    </task>
+    <option name="localTasksCounter" value="6" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -136,7 +143,8 @@
     <MESSAGE value="ver 1.1&#10;修改了样本信息，详细归类了样本字典表" />
     <MESSAGE value="ver 1.1.1&#10;修改了样本信息，详细归类了样本字典表&#10;修改了BUG" />
     <MESSAGE value="ver 2.0&#10;完成版" />
-    <option name="LAST_COMMIT_MESSAGE" value="ver 2.0&#10;完成版" />
+    <MESSAGE value="ver 2.1&#10;修改，如果近似度超过0.9，自动填写'company_full_name'名称" />
+    <option name="LAST_COMMIT_MESSAGE" value="ver 2.1&#10;修改，如果近似度超过0.9，自动填写'company_full_name'名称" />
   </component>
   <component name="WindowStateProjectService">
     <state x="440" y="190" key="#Deployment" timestamp="1619835305160">
@@ -147,22 +155,22 @@
       <screen x="0" y="23" width="1680" height="981" />
     </state>
     <state x="304" y="175" key="#com.intellij.execution.impl.EditConfigurationsDialog/0.23.1680.981@0.23.1680.981" timestamp="1619835106236" />
-    <state x="429" y="127" key="CommitChangelistDialog2" timestamp="1620298301219">
+    <state x="436" y="168" key="CommitChangelistDialog2" timestamp="1620357848649">
       <screen x="0" y="0" width="1680" height="1004" />
     </state>
-    <state x="429" y="127" key="CommitChangelistDialog2/0.0.1680.1004@0.0.1680.1004" timestamp="1620298301219" />
+    <state x="436" y="168" key="CommitChangelistDialog2/0.0.1680.1004@0.0.1680.1004" timestamp="1620357848649" />
     <state x="349" y="164" key="SettingsEditor" timestamp="1619835144891">
       <screen x="0" y="0" width="1680" height="1004" />
     </state>
     <state x="349" y="164" key="SettingsEditor/0.0.1680.1004@0.0.1680.1004" timestamp="1619835144891" />
-    <state x="440" y="265" key="Vcs.Push.Dialog.v2" timestamp="1620298311501">
+    <state x="440" y="265" key="Vcs.Push.Dialog.v2" timestamp="1620357861172">
       <screen x="0" y="0" width="1680" height="1004" />
     </state>
-    <state x="440" y="265" key="Vcs.Push.Dialog.v2/0.0.1680.1004@0.0.1680.1004" timestamp="1620298311501" />
-    <state x="519" y="331" key="com.intellij.ide.util.TipDialog" timestamp="1620354209676">
+    <state x="440" y="265" key="Vcs.Push.Dialog.v2/0.0.1680.1004@0.0.1680.1004" timestamp="1620357861172" />
+    <state x="519" y="331" key="com.intellij.ide.util.TipDialog" timestamp="1620447086486">
       <screen x="0" y="0" width="1680" height="1004" />
     </state>
-    <state x="519" y="331" key="com.intellij.ide.util.TipDialog/0.0.1680.1004@0.0.1680.1004" timestamp="1620354209676" />
+    <state x="519" y="331" key="com.intellij.ide.util.TipDialog/0.0.1680.1004@0.0.1680.1004" timestamp="1620447086486" />
     <state x="519" y="346" key="com.intellij.ide.util.TipDialog/0.23.1680.981@0.23.1680.981" timestamp="1619834570566" />
     <state x="480" y="147" key="com.intellij.openapi.editor.actions.MultiplePasteAction$ClipboardContentChooser" timestamp="1619886089128">
       <screen x="0" y="0" width="1680" height="1004" />
